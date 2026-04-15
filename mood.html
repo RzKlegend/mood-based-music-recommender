@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mood-Based Music Recommender</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 { text-align: center; color: #333; margin-bottom: 10px; font-size: 28px; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; font-size: 14px; }
+        .section { margin-bottom: 30px; }
+
+        label { display: block; margin-bottom: 10px; color: #333; font-weight: 600; font-size: 14px; }
+
+        textarea {
+            width: 100%;
+            height: 120px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+        textarea:focus { outline: none; border-color: #667eea; }
+
+        .mood-display { display: flex; gap: 15px; margin-top: 15px; flex-wrap: wrap; }
+
+        .mood-badge {
+            background: #f0f0f0;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 13px;
+            color: #666;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+        .mood-badge.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+            font-weight: 600;
+        }
+
+        .mood-score { font-size: 12px; color: #999; margin-top: 8px; }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102,126,234,0.3); }
+        button:active { transform: translateY(0); }
+        button:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+
+        .spinner {
+            width: 18px; height: 18px;
+            border: 2px solid rgba(255,255,255,0.4);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            display: none;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .songs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .song-card {
+            background: #f9f9f9;
+            border: 2px solid #e0e0e0;
+            border-radius: 15px;
+            padding: 20px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .song-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 10px 30px rgba(102,126,234,0.15);
+            transform: translateY(-5px);
+        }
+
+        .song-cover {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            background: #eef1ff;
+            border: 1px solid #dde4ff;
+        }
+
+        .song-title { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 5px; }
+        .song-artist { font-size: 13px; color: #666; margin-bottom: 12px; }
+        .song-mood {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .song-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .song-link {
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 600;
+            color: #4e5fd3;
+            background: #edf0ff;
+            border: 1px solid #d8e0ff;
+            border-radius: 999px;
+            padding: 6px 10px;
+            transition: all 0.2s;
+        }
+
+        .song-link:hover {
+            background: #dfe6ff;
+            color: #2f41bb;
+        }
+
+        .info-box {
+            background: #f0f4ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 13px;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .no-results { text-align: center; color: #999; padding: 30px; font-size: 14px; }
+        .loading { text-align: center; color: #667eea; padding: 20px; font-size: 14px; }
+
+        .ai-explanation {
+            background: #fff8e1;
+            border-left: 4px solid #ffc107;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 13px;
+            color: #666;
+            line-height: 1.5;
+            display: none;
+        }
+        .ai-explanation strong { color: #333; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🎵 Mood-Based Music Recommender</h1>
+    <p class="subtitle">Share your feelings in any words — AI understands you</p>
+
+    <div class="section">
+        <label for="moodText">How are you feeling?</label>
+        <textarea
+            id="moodText"
+            placeholder="Just talk naturally... e.g. 'Had the worst day, everything went wrong' or 'Just got promoted, can't stop smiling!' or 'It's raining outside and I feel like doing nothing'"
+        ></textarea>
+        <div class="mood-display" id="moodDisplay"></div>
+        <div class="mood-score" id="moodScore"></div>
+        <div class="ai-explanation" id="aiExplanation"></div>
+    </div>
+
+    <button id="mainBtn" onclick="getRecommendations()">
+        <div class="spinner" id="spinner"></div>
+        <span id="btnText">Get Recommendations</span>
+    </button>
+
+    <div id="results" style="margin-top: 30px;"></div>
+
+    <div class="info-box">
+        💡 Powered by Python Flask Backend + JavaScript Frontend — Mood analysis runs on Python NLP algorithm. Just type how you feel in any words, any language style!
+    </div>
+</div>
+
+<script>
+    const musicDatabase = [
+        { title: "Walking on Sunshine", artist: "Katrina & The Waves", mood: "happy", genres: ["pop", "upbeat"] },
+        { title: "Good As Hell", artist: "Lizzo", mood: "happy", genres: ["pop", "upbeat"] },
+        { title: "Don't Stop Me Now", artist: "Queen", mood: "happy", genres: ["rock", "upbeat"] },
+        { title: "Here Comes the Sun", artist: "The Beatles", mood: "happy", genres: ["rock", "upbeat"] },
+        { title: "Happy", artist: "Pharrell Williams", mood: "happy", genres: ["pop", "upbeat"] },
+
+        { title: "Someone Like You", artist: "Adele", mood: "sad", genres: ["ballad", "emotional"] },
+        { title: "The Night We Met", artist: "Lord Huron", mood: "sad", genres: ["indie", "melancholic"] },
+        { title: "Hurt", artist: "Johnny Cash", mood: "sad", genres: ["country", "emotional"] },
+        { title: "Black", artist: "Pearl Jam", mood: "sad", genres: ["grunge", "melancholic"] },
+        { title: "Sad Beautiful Tragic", artist: "Taylor Swift", mood: "sad", genres: ["pop", "emotional"] },
+
+        { title: "Weightless", artist: "Marconi Union", mood: "calm", genres: ["ambient", "relaxing"] },
+        { title: "Breathe", artist: "Pink Floyd", mood: "calm", genres: ["progressive", "meditative"] },
+        { title: "Clair de Lune", artist: "Claude Debussy", mood: "calm", genres: ["classical", "serene"] },
+        { title: "Skinny Love", artist: "Bon Iver", mood: "calm", genres: ["indie", "acoustic"] },
+        { title: "All Is Well", artist: "Edward Sharpe", mood: "calm", genres: ["folk", "peaceful"] },
+
+        { title: "Eye of the Tiger", artist: "Survivor", mood: "energetic", genres: ["rock", "intense"] },
+        { title: "High for This", artist: "The Weeknd", mood: "energetic", genres: ["electronic", "intense"] },
+        { title: "Shut Up and Dance", artist: "Walk the Moon", mood: "energetic", genres: ["pop", "intense"] },
+        { title: "Blinding Lights", artist: "The Weeknd", mood: "energetic", genres: ["synth", "intense"] },
+        { title: "Thunderstruck", artist: "AC/DC", mood: "energetic", genres: ["rock", "intense"] },
+
+        { title: "Thinking Out Loud", artist: "Ed Sheeran", mood: "romantic", genres: ["pop", "emotional"] },
+        { title: "Perfect", artist: "Ed Sheeran", mood: "romantic", genres: ["pop", "romantic"] },
+        { title: "All of Me", artist: "John Legend", mood: "romantic", genres: ["pop", "emotional"] },
+        { title: "A Thousand Years", artist: "Christina Perri", mood: "romantic", genres: ["pop", "romantic"] },
+        { title: "Chasing Cars", artist: "Snow Patrol", mood: "romantic", genres: ["indie", "emotional"] },
+    ];
+
+    const moodEmojis = { happy: '😊', sad: '😢', calm: '😌', energetic: '⚡', romantic: '💕' };
+    const coverCache = {};
+
+    function buildMusicLinks(song) {
+        const query = encodeURIComponent(`${song.title} ${song.artist}`);
+        return {
+            spotify: `https://open.spotify.com/search/${query}`,
+            youtube: `https://www.youtube.com/results?search_query=${query}`,
+            apple: `https://music.apple.com/us/search?term=${query}`
+        };
+    }
+
+    function getFallbackCoverUrl(song) {
+        return `https://ui-avatars.com/api/?name=${encodeURIComponent(song.title)}&background=667eea&color=ffffff&size=512&bold=true&format=png`;
+    }
+
+    async function getSongCover(song) {
+        const key = `${song.title}|${song.artist}`;
+        if (coverCache[key]) {
+            return coverCache[key];
+        }
+
+        const fallback = getFallbackCoverUrl(song);
+
+        try {
+            const term = encodeURIComponent(`${song.title} ${song.artist}`);
+            const response = await fetch(`https://itunes.apple.com/search?term=${term}&entity=song&limit=1`);
+            if (!response.ok) {
+                coverCache[key] = fallback;
+                return fallback;
+            }
+
+            const data = await response.json();
+            const artwork = data?.results?.[0]?.artworkUrl100;
+            const highResArtwork = artwork ? artwork.replace('100x100bb', '600x600bb') : fallback;
+            coverCache[key] = highResArtwork;
+            return highResArtwork;
+        } catch {
+            coverCache[key] = fallback;
+            return fallback;
+        }
+    }
+
+    async function hydrateSongCovers() {
+        const coverElements = Array.from(document.querySelectorAll('.song-cover[data-title][data-artist]'));
+        await Promise.all(
+            coverElements.map(async (img) => {
+                const song = {
+                    title: img.getAttribute('data-title') || '',
+                    artist: img.getAttribute('data-artist') || ''
+                };
+                const coverUrl = await getSongCover(song);
+                img.src = coverUrl;
+            })
+        );
+    }
+
+    const moodKeywords = {
+        happy: [
+            'happy', 'great', 'good', 'awesome', 'excited', 'joy', 'joyful', 'smile', 'smiling',
+            'promoted', 'win', 'winning', 'celebrate', 'celebration', 'proud', 'relieved', 'fun'
+        ],
+        sad: [
+            'sad', 'down', 'depressed', 'heartbroken', 'cry', 'crying', 'lonely', 'lost', 'hurt',
+            'upset', 'disappointed', 'hopeless', 'worst', 'tired of', 'empty', 'broken'
+        ],
+        calm: [
+            'calm', 'peaceful', 'relaxed', 'chill', 'quiet', 'slow', 'sleepy', 'exhausted', 'tired',
+            'rest', 'resting', 'meditative', 'rain', 'rainy', 'nothing', 'still'
+        ],
+        energetic: [
+            'energetic', 'hyped', 'pumped', 'motivated', 'fired up', 'angry', 'mad', 'rage',
+            'anxious', 'stressed', 'intense', 'focus', 'grind', 'power', 'strong', 'beast mode'
+        ],
+        romantic: [
+            'love', 'romantic', 'miss', 'missing', 'crush', 'affection', 'date', 'partner',
+            'girlfriend', 'boyfriend', 'wife', 'husband', 'beautiful', 'together', 'heart'
+        ]
+    };
+
+    function analyzeMoodLocally(text) {
+        const normalized = text.toLowerCase();
+        const scores = { happy: 0, sad: 0, calm: 0, energetic: 0, romantic: 0 };
+        const matchedEmotions = [];
+
+        Object.entries(moodKeywords).forEach(([mood, keywords]) => {
+            keywords.forEach((keyword) => {
+                if (normalized.includes(keyword)) {
+                    scores[mood] += 1;
+                    if (!matchedEmotions.includes(keyword)) {
+                        matchedEmotions.push(keyword);
+                    }
+                }
+            });
+        });
+
+        const ranked = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+        const [primaryMood, topScore] = ranked[0];
+        const secondScore = ranked[1][1];
+        const hasSignal = topScore > 0;
+        const confidence = !hasSignal
+            ? 'low'
+            : topScore >= 3
+                ? 'high'
+                : topScore > secondScore
+                    ? 'medium'
+                    : 'low';
+
+        const fallbackMood = hasSignal ? primaryMood : 'calm';
+        const explanation = hasSignal
+            ? `I detected words that indicate a ${fallbackMood} mood.`
+            : 'No strong mood words were found, so I selected a calm vibe by default.';
+
+        return {
+            primary_mood: fallbackMood,
+            confidence,
+            detected_emotions: matchedEmotions.slice(0, 6).map(e => e.replace(/\b\w/g, c => c.toUpperCase())),
+            explanation,
+            source: 'local'
+        };
+    }
+
+    function parseJsonSafely(text) {
+        try {
+            return JSON.parse(text);
+        } catch {
+            return null;
+        }
+    }
+
+    async function analyzeMoodWithAI(text) {
+        const localResult = analyzeMoodLocally(text);
+
+        try {
+            // Call Python Flask backend for mood analysis
+            const response = await fetch('/api/analyze-mood', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    text: text
+                })
+            });
+
+            if (!response.ok) {
+                console.warn('Backend analysis failed, using local fallback');
+                return localResult;
+            }
+
+            const result = await response.json();
+            
+            if (!result.primary_mood || !moodEmojis[result.primary_mood]) {
+                return localResult;
+            }
+
+            return {
+                primary_mood: result.primary_mood,
+                confidence: result.confidence,
+                detected_emotions: Array.isArray(result.detected_emotions) ? result.detected_emotions.slice(0, 6) : [],
+                explanation: result.explanation,
+                source: 'python_backend'
+            };
+        } catch (err) {
+            console.warn('Backend error:', err, '— using local fallback');
+            return localResult;
+        }
+    }
+
+    function setLoading(on) {
+        const btn = document.getElementById('mainBtn');
+        const spinner = document.getElementById('spinner');
+        const btnText = document.getElementById('btnText');
+        btn.disabled = on;
+        spinner.style.display = on ? 'block' : 'none';
+        btnText.textContent = on ? 'Analyzing your mood...' : 'Get Recommendations';
+    }
+
+    function showMoodBadges(result) {
+        const display = document.getElementById('moodDisplay');
+        const scoreEl = document.getElementById('moodScore');
+        const explanationEl = document.getElementById('aiExplanation');
+
+        display.innerHTML = '';
+
+        // Primary mood badge
+        const primary = document.createElement('div');
+        primary.className = 'mood-badge active';
+        primary.textContent = `${moodEmojis[result.primary_mood] || '🎵'} ${result.primary_mood.charAt(0).toUpperCase() + result.primary_mood.slice(1)}`;
+        display.appendChild(primary);
+
+        // Detected emotion tags
+        result.detected_emotions.forEach(emotion => {
+            const badge = document.createElement('div');
+            badge.className = 'mood-badge';
+            badge.style.fontSize = '12px';
+            badge.textContent = emotion;
+            display.appendChild(badge);
+        });
+
+        scoreEl.innerHTML = `<strong>Confidence:</strong> ${result.confidence}`;
+
+        explanationEl.style.display = 'block';
+        explanationEl.innerHTML = `<strong>🤖 AI says:</strong> ${result.explanation}`;
+    }
+
+    async function getRecommendations() {
+        const text = document.getElementById('moodText').value.trim();
+        if (!text) { alert('Please describe your mood first!'); return; }
+
+        setLoading(true);
+        document.getElementById('results').innerHTML = '';
+        document.getElementById('moodDisplay').innerHTML = '';
+        document.getElementById('moodScore').innerHTML = '';
+        document.getElementById('aiExplanation').style.display = 'none';
+
+        try {
+            const result = await analyzeMoodWithAI(text);
+            showMoodBadges(result);
+
+            const songs = musicDatabase.filter(s => s.mood === result.primary_mood);
+            displaySongs(songs, result.primary_mood);
+        } catch (err) {
+            document.getElementById('results').innerHTML = `<div class="no-results">⚠️ Couldn't analyze mood. Please try again.<br><small style="color:#bbb">${err.message}</small></div>`;
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    function displaySongs(songs, mood) {
+        const resultsDiv = document.getElementById('results');
+        if (!songs.length) {
+            resultsDiv.innerHTML = '<div class="no-results">No songs found for this mood. Try rephrasing!</div>';
+            return;
+        }
+
+        let html = `<h2 style="color:#333;margin-bottom:20px;font-size:20px;">🎶 Recommended for your "${mood}" mood</h2><div class="songs-grid">`;
+        songs.forEach(song => {
+            const links = buildMusicLinks(song);
+            const fallbackCover = getFallbackCoverUrl(song);
+            html += `
+                <div class="song-card">
+                    <img class="song-cover" src="${fallbackCover}" data-title="${song.title}" data-artist="${song.artist}" alt="${song.title} cover" loading="lazy" />
+                    <div class="song-title">${song.title}</div>
+                    <div class="song-artist">by ${song.artist}</div>
+                    <div class="song-mood">${moodEmojis[song.mood] || '🎵'} ${song.mood}</div>
+                    <div class="song-links">
+                        <a class="song-link" href="${links.spotify}" target="_blank" rel="noopener noreferrer">Spotify</a>
+                        <a class="song-link" href="${links.youtube}" target="_blank" rel="noopener noreferrer">YouTube</a>
+                        <a class="song-link" href="${links.apple}" target="_blank" rel="noopener noreferrer">Apple Music</a>
+                    </div>
+                </div>`;
+        });
+        html += '</div>';
+        resultsDiv.innerHTML = html;
+        hydrateSongCovers();
+    }
+</script>
+</body>
+</html>
